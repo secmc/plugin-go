@@ -8,7 +8,7 @@ import (
 
 func main() {
 	commands := []*plugin.Command{
-		plugin.NewCommand("plugin", "", nil, testCommands{}),
+		plugin.NewCommand("plugin", "", []string{}, testCommands{}),
 	}
 
 	p, err := plugin.NewPlugin("test", plugin.WithCommandsOpt(commands...))

@@ -80,9 +80,9 @@ func (p *Plugin) handleMessages() error {
 			return err
 		}
 
-		switch event := msg.GetEvent().Payload.(type) {
-		case *generated.EventEnvelope_Command:
-			p.executeCommand(event.Command.Name)
+		if event := msg.GetEvent(); event != nil {
+			p.handleEvent(event)
+			continue
 		}
 
 		switch payload := msg.GetPayload().(type) {
@@ -94,10 +94,16 @@ func (p *Plugin) handleMessages() error {
 	}
 }
 
+func (p *Plugin) handleEvent(e *generated.EventEnvelope) {
+	switch event := e.Payload.(type) {
+	case *generated.EventEnvelope_Command:
+		p.executeCommand(event.Command.Name)
+	}
+}
+
 func (p *Plugin) executeCommand(name string) {
 	for _, cmd := range p.commands {
 		if strings.EqualFold(cmd.name, name) {
-			cmd.runnables[0].Run()
 		}
 	}
 }
