@@ -1,20 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"os"
 
 	"github.com/secmc/plugin-go/plugin"
 )
 
 func main() {
-	fmt.Println(os.Getenv("HOST"))
-
-	p, err := plugin.NewPlugin("test")
+	_, err := plugin.NewPlugin("test")
 	if err != nil {
-		log.Fatalln()
+		log.Fatalln(err)
 	}
-
-	_ = p
+	select {}
 }
