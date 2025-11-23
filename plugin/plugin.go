@@ -3,8 +3,8 @@ package plugin
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
+	"strings"
 
 	generated "github.com/secmc/plugin/proto/generated/go"
 	"google.golang.org/grpc"
@@ -12,10 +12,22 @@ import (
 )
 
 type Plugin struct {
+	id     string
+	name   string
 	stream generated.Plugin_EventStreamClient
+
+	commands []*Command
 }
 
-func NewPlugin(name string) (*Plugin, error) {
+type Opt func(p *Plugin)
+
+func WithCommandsOpt(commands ...*Command) func(p *Plugin) {
+	return func(p *Plugin) {
+		p.commands = commands
+	}
+}
+
+func NewPlugin(name string, opts ...Opt) (*Plugin, error) {
 	serverHost := os.Getenv("DF_PLUGIN_SERVER_ADDRESS")
 	conn, err := grpc.NewClient(serverHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -27,37 +39,65 @@ func NewPlugin(name string) (*Plugin, error) {
 		return nil, err
 	}
 	pl := &Plugin{
+		id:     os.Getenv("DF_PLUGIN_ID"),
+		name:   name,
 		stream: stream,
 	}
 
-	pluginID := os.Getenv("DF_PLUGIN_ID")
-	err = pl.stream.Send(&generated.PluginToHost{
-		PluginId: pluginID,
+	return pl, nil
+}
+
+func (p *Plugin) Start() error {
+	var commandSpecs []*generated.CommandSpec
+	for _, cmd := range p.commands {
+		commandSpecs = append(commandSpecs, &generated.CommandSpec{
+			Name:        cmd.name,
+			Aliases:     cmd.aliases,
+			Description: cmd.description,
+		})
+	}
+
+	err := p.stream.Send(&generated.PluginToHost{
+		PluginId: p.id,
 		Payload: &generated.PluginToHost_Hello{
 			Hello: &generated.PluginHello{
-				Name: name,
+				Name:     p.name,
+				Commands: commandSpecs,
 			},
 		},
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	go pl.handleMessages()
-	return pl, nil
+	return p.handleMessages()
 }
 
-func (p *Plugin) handleMessages() {
+func (p *Plugin) handleMessages() error {
 	for {
 		msg, err := p.stream.Recv()
 		if err != nil {
-			log.Fatalln(err)
-			return
+			return err
 		}
 
-		payload := msg.GetPayload()
-		if _, ok := payload.(*generated.HostToPlugin_Hello); ok {
+		switch event := msg.GetEvent().Payload.(type) {
+		case *generated.EventEnvelope_Command:
+			p.executeCommand(event.Command.Name)
+		}
+
+		switch payload := msg.GetPayload().(type) {
+		case *generated.HostToPlugin_Hello:
 			fmt.Println("Golang plugin successfully registered")
+		case *generated.HostToPlugin_ServerInfo:
+			fmt.Println(payload.ServerInfo.Plugins)
+		}
+	}
+}
+
+func (p *Plugin) executeCommand(name string) {
+	for _, cmd := range p.commands {
+		if strings.EqualFold(cmd.name, name) {
+			cmd.runnables[0].Run()
 		}
 	}
 }
