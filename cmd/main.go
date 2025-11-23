@@ -11,11 +11,12 @@ func main() {
 		plugin.NewCommand("plugin", "", nil, testCommands{}),
 	}
 
-	_, err := plugin.NewPlugin("test", plugin.WithCommandsOpt(commands...))
+	p, err := plugin.NewPlugin("test", plugin.WithCommandsOpt(commands...))
 	if err != nil {
 		log.Fatalln(err)
 	}
-	select {}
+
+	p.Start()
 }
 
 type testCommands struct {
