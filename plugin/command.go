@@ -1,5 +1,7 @@
 package plugin
 
+import "github.com/secmc/plugin-go/plugin/player"
+
 type Command struct {
 	runnables []Runnable
 
@@ -18,5 +20,5 @@ func NewCommand(name, description string, aliases []string, runnables ...Runnabl
 }
 
 type Runnable interface {
-	Run()
+	Run(p *player.Player)
 }

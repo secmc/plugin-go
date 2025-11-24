@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/secmc/plugin-go/plugin"
+	"github.com/secmc/plugin-go/plugin/player"
 )
 
 func main() {
@@ -22,4 +23,4 @@ func main() {
 type testCommands struct {
 }
 
-func (testCommands) Run() {}
+func (testCommands) Run(p *player.Player) {}

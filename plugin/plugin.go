@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
+	"github.com/secmc/plugin-go/plugin/player"
 	generated "github.com/secmc/plugin/proto/generated/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -17,6 +19,9 @@ type Plugin struct {
 	stream generated.Plugin_EventStreamClient
 
 	commands []*Command
+
+	playerMu sync.Mutex
+	players  map[string]*player.Player
 }
 
 type Opt func(p *Plugin)
@@ -98,12 +103,41 @@ func (p *Plugin) handleEvent(e *generated.EventEnvelope) {
 	switch event := e.Payload.(type) {
 	case *generated.EventEnvelope_Command:
 		p.executeCommand(event.Command.Name)
+	case *generated.EventEnvelope_PlayerJoin:
+		pl := player.New(event.PlayerJoin.Name, event.PlayerJoin.PlayerUuid)
+		p.addPlayer(pl)
+	case *generated.EventEnvelope_PlayerQuit:
+		pl, ok := p.playerFromUUID(event.PlayerQuit.PlayerUuid)
+		if !ok {
+			return
+		}
+		p.deletePlayer(pl)
 	}
+}
+
+func (p *Plugin) addPlayer(pl *player.Player) {
+	p.playerMu.Lock()
+	p.players[p.id] = pl
+	p.playerMu.Unlock()
+}
+
+func (p *Plugin) deletePlayer(pl *player.Player) {
+	p.playerMu.Lock()
+	delete(p.players, pl.UUID())
+	p.playerMu.Unlock()
+}
+
+func (p *Plugin) playerFromUUID(uuid string) (*player.Player, bool) {
+	p.playerMu.Lock()
+	pl, ok := p.players[uuid]
+	p.playerMu.Unlock()
+	return pl, ok
 }
 
 func (p *Plugin) executeCommand(name string) {
 	for _, cmd := range p.commands {
 		if strings.EqualFold(cmd.name, name) {
+			//
 		}
 	}
 }
